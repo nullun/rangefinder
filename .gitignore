@@ -1,0 +1,8 @@
+*.o
+*.lib
+*.a
+*.dll
+*.so
+*.exe
+*.out
+packet.log
