@@ -7,7 +7,8 @@ Requirements
 ------------
 
  * Listen for ANY addressed packet
- * Indicate range either in full or by LED and a predefined value
+ * Avoid using pcap for portability
+ * Indicate the range either in full (LCD) or a predefined value (LED)
 
 TODO
 ----
@@ -25,6 +26,13 @@ Linux:
 ```
 sudo ./rangefinder
 ```
+
+References
+----------
+
+[C Language Examples of IPv4 and IPv6 Raw Sockets for Linux](http://www.pdbuchan.com/rawsock/rawsock.html)
+
+[socket(2) - Linux man page](http://linux.die.net/man/2/socket)
 
 Contributing
 ------------
