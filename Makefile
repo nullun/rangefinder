@@ -1,5 +1,5 @@
 make: main.c
-	gcc -o rangefinder main.c
+	@gcc -o rangefinder main.c
 clean:
-	rm rangefinder
+	-@rm -f rangefinder packets.log 2>/dev/null
 
