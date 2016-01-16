@@ -1,12 +1,14 @@
-#include <stdio.h>       // Standard Input/Output
-#include <stdlib.h>      // For malloc
-#include <string.h>      // For memset
-#include <netinet/tcp.h> // TCP Header declarations
-#include <netinet/ip.h>  // IP Header declarations
-#include <sys/socket.h>  // The meat
-#include <arpa/inet.h>   // Easier to display IPs
+#include <stdio.h>            // Standard Input/Output
+#include <stdlib.h>           // For malloc
+#include <string.h>           // For memset
+#include <netinet/if_ether.h> // Ethernet Header declarations
+#include <netinet/ip.h>       // IP Header declarations
+#include <netinet/tcp.h>      // TCP Header declarations
+#include <sys/socket.h>       // The meat
+#include <arpa/inet.h>        // Easier to display IPs
 
-void ProcessPacket(unsigned char *, int);
+void process_packet(unsigned char *, int);
+void print_ethernet_header(unsigned char*, int);
 void print_ip_header(unsigned char *, int);
 void print_tcp_packet(unsigned char *, int);
 
@@ -19,7 +21,6 @@ int main(void) {
 	int data_size;
 	socklen_t saddr_size;
 	struct sockaddr saddr;
-//	struct in_addr in;
 
 	unsigned char *buffer = (unsigned char *)malloc(65536);
 
@@ -29,7 +30,9 @@ int main(void) {
 		return 1;
 	}
 
-	socket_raw = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
+	socket_raw = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+	// setsockopt allows you to specify a device, change and rebuild if required
+	setsockopt(socket_raw, SOL_SOCKET, SO_BINDTODEVICE, "wlan0", strlen("wlan0")+1);
 	if (socket_raw < 0) {
 		printf("Unable to open socket.\n");
 		return 1;
@@ -42,15 +45,15 @@ int main(void) {
 			printf("Unable to receive messages from socket.\n");
 			return 1;
 		}
-		ProcessPacket(buffer, data_size);
+		process_packet(buffer, data_size);
 	}
 
 	close(socket_raw);
 	return 0;
 }
 
-void ProcessPacket(unsigned char* buffer, int size) {
-	struct iphdr *ip_header = (struct iphdr*)buffer;
+void process_packet(unsigned char* buffer, int size) {
+	struct iphdr *ip_header = (struct iphdr*)(buffer + sizeof(struct ethhdr));
 
 	if (ip_header->protocol == 6) {
 		++total;
@@ -60,10 +63,22 @@ void ProcessPacket(unsigned char* buffer, int size) {
 	printf("Total Packets: %d\r", total);
 }
 
+void print_ethernet_header(unsigned char* buffer, int size) {
+	struct ethhdr *eth_header = (struct ethhdr *)buffer;
+
+	fprintf(logfile, "\n");
+	fprintf(logfile, "Ethernet Header\n");
+	fprintf(logfile, "\t|-Destination Address\t: %.2X-%.2X-%.2X-%.2X-%.2X-%.2X\n", eth_header->h_dest[0], eth_header->h_dest[1], eth_header->h_dest[2], eth_header->h_dest[3], eth_header->h_dest[4], eth_header->h_dest[5]);
+	fprintf(logfile, "\t|-Source Address\t: %.2X-%.2X-%.2X-%.2X-%.2X-%.2X\n", eth_header->h_source[0], eth_header->h_source[1], eth_header->h_source[2], eth_header->h_source[3], eth_header->h_source[4], eth_header->h_source[5]);
+	fprintf(logfile, "\t|-Protocol\t\t: %u\n", (unsigned short)eth_header->h_proto);
+}
+
 void print_ip_header(unsigned char* buffer, int size) {
+	print_ethernet_header(buffer, size);
+
 	unsigned short iphdrlen;
 
-	struct iphdr *ip_header = (struct iphdr *)buffer;
+	struct iphdr *ip_header = (struct iphdr*)(buffer + sizeof(struct ethhdr));
 	iphdrlen = ip_header->ihl*4;
 
 	memset(&source, 0, sizeof(source));
@@ -72,6 +87,7 @@ void print_ip_header(unsigned char* buffer, int size) {
 	memset(&dest, 0, sizeof(dest));
 	dest.sin_addr.s_addr = ip_header->daddr;
 
+	fprintf(logfile, "\n");
 	fprintf(logfile, "IP Header\n");
 	fprintf(logfile, "\t|-IP Version\t\t: %d\n", (unsigned int)ip_header->version);
 	fprintf(logfile, "\t|-IP Header Length\t: %d DWORDS or %d Bytes\n", (unsigned int)ip_header->ihl, ((unsigned int)(ip_header->ihl))*4);
@@ -84,12 +100,12 @@ void print_ip_header(unsigned char* buffer, int size) {
 void print_tcp_packet(unsigned char* buffer, int size) {
 	unsigned short iphdrlen;
 
-	struct iphdr *ip_header = (struct iphdr *)buffer;
+	struct iphdr *ip_header = (struct iphdr*)(buffer + sizeof(struct ethhdr));
 	iphdrlen = ip_header->ihl*4;
 
-	struct tcphdr *tcp_header=(struct tcphdr*)(buffer + iphdrlen);
+	struct tcphdr *tcp_header = (struct tcphdr*)(buffer + iphdrlen + sizeof(struct ethhdr));
 
-	fprintf(logfile, "\n ***** TCP PACKET *****\n\n");
+	fprintf(logfile, "\n ***** TCP PACKET *****\n");
 
 	print_ip_header(buffer, size);
 
