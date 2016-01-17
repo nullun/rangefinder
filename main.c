@@ -1,6 +1,9 @@
 #include <stdio.h>            // Standard Input/Output
 #include <stdlib.h>           // For malloc
 #include <string.h>           // For memset
+#include <signal.h>           // Capture ctrl+c and exit gracefully
+#include <sys/ioctl.h>        // Manipulate device parameters
+#include <net/if.h>           // Interface structure (IFF_PROMISC)
 #include <netinet/if_ether.h> // Ethernet Header declarations
 #include <netinet/ip.h>       // IP Header declarations
 #include <netinet/tcp.h>      // TCP Header declarations
@@ -12,10 +15,18 @@ void print_ethernet_header(unsigned char*, int);
 void print_ip_header(unsigned char *, int);
 void print_tcp_packet(unsigned char *, int);
 
+char *interface = "wlan0";
 int socket_raw;
 FILE *logfile;
 int total=0;
 struct sockaddr_in source, dest;
+
+// Disgusting hack. Rewrite.
+int running = 1;
+void int_handler(int dummy) {
+	running = 0;
+	printf("\nStopping...\n");
+}
 
 int main(void) {
 	int data_size;
@@ -30,15 +41,29 @@ int main(void) {
 		return 1;
 	}
 
+	// Create RAW Ethernet Socket
 	socket_raw = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
-	// setsockopt allows you to specify a device, change and rebuild if required
-	setsockopt(socket_raw, SOL_SOCKET, SO_BINDTODEVICE, "wlan0", strlen("wlan0")+1);
+
+	// Interface Request
+	struct ifreq if_req;
+	memset(&if_req, 0, sizeof(if_req));
+	strncpy((char *)if_req.ifr_name, interface, strlen(interface));
+	if_req.ifr_flags = IFF_UP|IFF_PROMISC;    // Interface UP and PROMISC.
+	ioctl(socket_raw, SIOCSIFFLAGS, &if_req); // Set Interface
+
+	// Apply the configuration to our socket.
+	setsockopt(socket_raw, SOL_SOCKET, SO_BINDTODEVICE, (void *)&if_req, sizeof(if_req));
+
 	if (socket_raw < 0) {
 		printf("Unable to open socket.\n");
 		return 1;
 	}
 
-	while(1) {
+	signal(SIGINT, int_handler);
+
+	printf("Starting...\n");
+
+	while(running) {
 		saddr_size = sizeof(saddr);
 		data_size = recvfrom(socket_raw, buffer, 65536, 0, &saddr, &saddr_size);
 		if (data_size < 0) {
@@ -48,6 +73,13 @@ int main(void) {
 		process_packet(buffer, data_size);
 	}
 
+	printf("Finished!\n");
+
+	/* Remove Promiscuous Mode */
+	if_req.ifr_flags &= ~IFF_PROMISC;         // Interface not PROMISC.
+	ioctl(socket_raw, SIOCSIFFLAGS, &if_req); // Set Interface
+
+	// Close RAW Ethernet Socket
 	close(socket_raw);
 	return 0;
 }
