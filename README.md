@@ -6,7 +6,7 @@ This project started to help identify the range of a network on any given NIC po
 Requirements
 ------------
 
- * Listen for ANY addressed packet
+ * Listen for ANY addressed packet (Promiscuous)
  * Avoid using pcap for portability
  * Indicate the range either in full (LCD) or a predefined value (LED)
 
@@ -16,7 +16,9 @@ TODO
  * Choose a license
  * Port code over to PIC [TCP/IP stack](http://www.microchip.com/tcpip/)
  * Separate functions out into other files
+ * Rewrite the signal interrupt function
  * Design schematic diagram
+ * Fix various text output bugs
 
 Usage
 -----
