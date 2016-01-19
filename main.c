@@ -1,6 +1,7 @@
 #include <stdio.h>            // Standard Input/Output
 #include <stdlib.h>           // For malloc
 #include <string.h>           // For memset
+#include <unistd.h>           // For close
 #include <signal.h>           // Capture ctrl+c and exit gracefully
 #include <sys/ioctl.h>        // Manipulate device parameters
 #include <net/if.h>           // Interface structure (IFF_PROMISC)
